@@ -16,7 +16,7 @@ public:
     //端口号
     int PORT;
 
-    //日志写入方式
+    //日志写入方式 0:同步 1:异步
     int LOGWrite;
 
     //触发组合模式
@@ -42,6 +42,9 @@ public:
 
     //并发模型选择
     int actor_model;
+    
+    // 新增：异步日志队列大小
+    int log_queue_size;
 };
 
 #endif

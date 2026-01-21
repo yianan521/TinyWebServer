@@ -4,8 +4,8 @@ Config::Config(){
     //端口号,默认9006
     PORT = 9006;
 
-    //日志写入方式，默认同步
-    LOGWrite = 0;
+    //日志写入方式，默认异步
+    LOGWrite = 1;  // 0:同步，1:异步
 
     //触发组合模式,默认listenfd LT + connfd LT
     TRIGMode = 0;
@@ -30,11 +30,14 @@ Config::Config(){
 
     //并发模型,默认是proactor
     actor_model = 0;
+    
+    // 新增：异步日志队列大小，默认1000
+    log_queue_size = 1000;
 }
 
 void Config::parse_arg(int argc, char*argv[]){
     int opt;
-    const char *str = "p:l:m:o:s:t:c:a:";
+    const char *str = "p:l:m:o:s:t:c:a:q:";
     while ((opt = getopt(argc, argv, str)) != -1)
     {
         switch (opt)
@@ -77,6 +80,11 @@ void Config::parse_arg(int argc, char*argv[]){
         case 'a':
         {
             actor_model = atoi(optarg);
+            break;
+        }
+        case 'q':  // 新增：日志队列大小参数
+        {
+            log_queue_size = atoi(optarg);
             break;
         }
         default:
