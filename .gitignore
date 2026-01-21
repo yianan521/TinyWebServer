@@ -1,0 +1,30 @@
+# 编译文件
+build/
+*.o
+*.a
+*.so
+*.out
+server
+bin/
+
+# 日志文件
+*.log
+logs/
+*.pid
+
+# 数据库文件
+*.db
+*.sqlite
+
+# IDE文件
+.vscode/
+.idea/
+*.swp
+*.swo
+*.code-workspace
+
+# 临时文件
+*.tmp
+temp/
+.DS_Store
+Thumbs.db
