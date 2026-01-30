@@ -14,7 +14,8 @@
 #include "./threadpool/threadpool.h"
 #include "./http/http_conn.h"
 #include "include/simple_conn_pool.h"
-
+#include <openssl/ssl.h>
+#include <openssl/err.h>
 const int MAX_FD = 65536;           //最大文件描述符
 const int MAX_EVENT_NUMBER = 10000; //最大事件数
 const int TIMESLOT = 5;             //最小超时单位
@@ -46,7 +47,12 @@ public:
     // 连接池相关方法
     void init_conn_pool(int size = 100);
     void show_pool_stats();
+   SSL_CTX* m_ssl_ctx=nullptr;
+    bool m_use_https=false;
+    int m_https_port;
 
+    void init_ssl(const char* cert_path, const char* key_path); // 支持传入路径
+    SSL* create_ssl(int sockfd);
 public:
     //基础
     int m_port;

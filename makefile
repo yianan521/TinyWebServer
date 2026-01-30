@@ -15,7 +15,7 @@ SRCS = main.cpp \
        config.cpp
 
 # 库文件
-LIBS = -lpthread -lmysqlclient
+LIBS = -lpthread -lmysqlclient -lssl -lcrypto
 
 # 目标文件
 OBJS = $(SRCS:.cpp=.o)

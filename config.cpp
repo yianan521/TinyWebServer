@@ -4,7 +4,10 @@
 Config::Config(){
     //端口号,默认9006
     PORT = 9006;
-
+   HTTPS_PORT = 443;
+    USE_HTTPS = 1;
+       SSL_CERT_PATH = "./server.crt";   // 默认路径
+    SSL_KEY_PATH = "./server.key";
     //日志写入方式，默认异步
     LOGWrite = 1;  // 0:同步，1:异步
 

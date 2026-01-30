@@ -289,10 +289,19 @@ http_conn::HTTP_CODE http_conn::parse_request_line(char *text)
 //解析http请求的一个头部信息
 http_conn::HTTP_CODE http_conn::parse_headers(char *text)
 {
-    if (text[0] == '\0')
+   if (text[0] == '\0')
     {
         if (m_content_length != 0)
         {
+            // ============ 新增：检查POST请求体大小 ============
+            if (m_method == POST && is_post_too_large()) {
+                std::cout << "SECURITY: POST request too large: " << m_content_length 
+                          << " bytes (max: " << MAX_POST_SIZE << ")" << std::endl;
+                LOG_ERROR("POST request too large: %d bytes", m_content_length);
+                return BAD_REQUEST;
+            }
+            // =================================================
+            
             m_check_state = CHECK_STATE_CONTENT;
             return NO_REQUEST;
         }
@@ -312,6 +321,15 @@ http_conn::HTTP_CODE http_conn::parse_headers(char *text)
         text += 15;
         text += strspn(text, " \t");
         m_content_length = atol(text);
+        
+        // ============ 新增：立即检查长度 ============
+        if (m_method == POST && is_post_too_large()) {
+            std::cout << "SECURITY: POST content-length too large: " << m_content_length 
+                      << " bytes (max: " << MAX_POST_SIZE << ")" << std::endl;
+            LOG_ERROR("POST content-length too large: %d bytes", m_content_length);
+            return BAD_REQUEST;
+        }
+        // ===========================================
     }
     else if (strncasecmp(text, "Host:", 5) == 0)
     {
@@ -638,9 +656,18 @@ bool http_conn::process_write(HTTP_CODE ret)
             return false;
         break;
     }
-    case BAD_REQUEST:
+ 
+         case BAD_REQUEST:
     {
-        add_status_line(404, error_404_title);
+        add_status_line(400, error_400_title);  // 400 Bad Request
+        add_headers(strlen(error_400_form));
+        if (!add_content(error_400_form))
+            return false;
+        break;
+    }
+    case NO_RESOURCE:
+    {
+        add_status_line(404, error_404_title);  // 404 Not Found
         add_headers(strlen(error_404_form));
         if (!add_content(error_404_form))
             return false;

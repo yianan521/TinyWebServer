@@ -50,6 +50,13 @@ public:
     int http_conn_timeout;
     // 新增：异步日志队列大小
     int log_queue_size;
+
+    int USE_HTTPS;          // 👈 新增：0=HTTP, 1=HTTPS
+    int HTTPS_PORT;         // 👈 新增：如 443
+    string SSL_CERT_PATH;   // 👈 新增：证书路径
+    string SSL_KEY_PATH;    // 👈 新增：私钥路径
+
+
 };
 
 #endif

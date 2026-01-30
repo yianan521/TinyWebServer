@@ -1,21 +1,85 @@
 #include "webserver.h"
 #include <iostream>
-
+#include <dirent.h>
 WebServer::WebServer()
 {
-    //http_conn类对象
+//http_conn类对象
     users = new http_conn*[MAX_FD];
-      for (int i = 0; i < MAX_FD; ++i) {
+    for (int i = 0; i < MAX_FD; ++i) {
         users[i] = nullptr;  // 初始化为空
     }
 
-    //root文件夹路径
-    char server_path[200];
-    getcwd(server_path, 200);
-    char root[6] = "/root";
-    m_root = (char *)malloc(strlen(server_path) + strlen(root) + 1);
-    strcpy(m_root, server_path);
-    strcat(m_root, root);
+    // ============ 设置根目录路径 ============
+    char server_path[1024];
+    
+    // 获取当前工作目录
+    if (getcwd(server_path, sizeof(server_path)) != NULL) {
+        printf("当前工作目录: %s\n", server_path);
+        
+        // 构建 root 目录的完整路径
+        char full_path[2048];
+        snprintf(full_path, sizeof(full_path), "%s/root", server_path);
+        
+        m_root = strdup(full_path);
+        printf("设置服务器根目录为: %s\n", m_root);
+    } else {
+        // 回退方案：使用相对路径
+        printf("警告: 无法获取当前目录\n");
+        m_root = strdup("./root");
+        printf("使用相对路径: ./root\n");
+    }
+    
+    // 验证目录是否存在
+    struct stat st;
+    if (stat(m_root, &st) == 0 && S_ISDIR(st.st_mode)) {
+        printf("✓ 根目录验证成功\n");
+        
+        // 列出目录内容验证
+        printf("根目录内容:\n");
+        DIR *dir = opendir(m_root);
+        if (dir) {
+            struct dirent *entry;
+            int count = 0;
+            while ((entry = readdir(dir)) != NULL) {
+                if (strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) {
+                    printf("  - %s\n", entry->d_name);
+                    count++;
+                }
+            }
+            closedir(dir);
+            printf("总计 %d 个文件\n", count);
+            
+            // 特别检查关键文件
+            const char* key_files[] = {"judge.html", "welcome.html", "index.html", "test.txt", NULL};
+            for (int i = 0; key_files[i]; i++) {
+                char file_path[4096];
+                snprintf(file_path, sizeof(file_path), "%s/%s", m_root, key_files[i]);
+                if (access(file_path, F_OK) == 0) {
+                    printf("✓ 关键文件存在: %s\n", key_files[i]);
+                } else {
+                    printf("⚠ 警告: 关键文件不存在: %s\n", key_files[i]);
+                }
+            }
+        } else {
+            printf("✗ 无法打开根目录\n");
+        }
+    } else {
+        printf("✗ 错误: 根目录不存在或不是目录: %s\n", m_root);
+        printf("请确保在项目根目录下运行服务器\n");
+        
+        // 尝试使用绝对路径
+        char* home = getenv("HOME");
+        if (home) {
+            char abs_path[1024];
+            snprintf(abs_path, sizeof(abs_path), "%s/T/MyWebServer-master/root", home);
+            if (access(abs_path, F_OK) == 0) {
+                printf("尝试使用绝对路径: %s\n", abs_path);
+                free(m_root);
+                m_root = strdup(abs_path);
+            }
+        }
+    }
+    // ======================================
 
     //定时器
     users_timer = new client_data[MAX_FD];
@@ -78,6 +142,44 @@ void WebServer::trig_mode()
         m_CONNTrigmode = 1;
     }
 }
+
+void WebServer::init_ssl(const char* cert_path, const char* key_path) {
+    SSL_library_init();
+    SSL_load_error_strings();
+    OpenSSL_add_ssl_algorithms();
+
+    m_ssl_ctx = SSL_CTX_new(TLS_server_method());
+    if (!m_ssl_ctx) {
+        ERR_print_errors_fp(stderr);
+        exit(EXIT_FAILURE);
+    }
+
+    if (SSL_CTX_use_certificate_file(m_ssl_ctx, cert_path, SSL_FILETYPE_PEM) <= 0 ||
+        SSL_CTX_use_PrivateKey_file(m_ssl_ctx, key_path, SSL_FILETYPE_PEM) <= 0) {
+        ERR_print_errors_fp(stderr);
+        exit(EXIT_FAILURE);
+    }
+
+    if (!SSL_CTX_check_private_key(m_ssl_ctx)) {
+        fprintf(stderr, "Private key does not match the certificate\n");
+        exit(EXIT_FAILURE);
+    }
+
+    m_use_https = true;
+    printf("✓ HTTPS (SSL/TLS) initialized with cert: %s, key: %s\n", cert_path, key_path);
+}
+
+SSL* WebServer::create_ssl(int sockfd) {
+    SSL* ssl = SSL_new(m_ssl_ctx);
+    SSL_set_fd(ssl, sockfd);
+    if (SSL_accept(ssl) <= 0) {
+        ERR_print_errors_fp(stderr);
+        SSL_free(ssl);
+        return nullptr;
+    }
+    return ssl;
+}
+
 
 void WebServer::log_write()
 {
@@ -244,6 +346,16 @@ void WebServer::timer(int connfd, struct sockaddr_in client_address)
         conn->init(connfd, client_address, m_root, m_CONNTrigmode, 
                    m_close_log, m_user, m_passWord, m_databaseName);
         
+             if (m_use_https) {
+    SSL* ssl = SSL_new(m_ssl_ctx);  // 使用 WebServer 的 SSL_CTX
+    if (!ssl) {
+        LOG_ERROR("SSL_new failed for fd=%d", connfd);
+        // 处理错误（如关闭 connfd）
+        return;
+    }
+    SSL_set_fd(ssl, connfd);
+    conn->set_ssl(ssl);  // 这会设置 m_is_https = true
+}      
         // 将连接复制到 users 数组以保持兼容性
         users[connfd] = conn;
     } else {

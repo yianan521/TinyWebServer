@@ -1,5 +1,5 @@
 #include "config.h"
-
+#include <unistd.h> 
 int main(int argc, char *argv[])
 {
     //使用简化的配置
@@ -12,7 +12,12 @@ int main(int argc, char *argv[])
     config.parse_arg(argc, argv);
 
     WebServer server;
-
+char server_path[200];
+getcwd(server_path, 200);
+printf("Current directory: %s\n", server_path);
+if (config.USE_HTTPS) {
+    server.init_ssl(config.SSL_CERT_PATH.c_str(), config.SSL_KEY_PATH.c_str());
+}
     //初始化（设置sql_num为实际连接数）
     // 注意：这里sql_num=5，表示初始化5个数据库连接
     server.init(config.PORT, user, passwd, databasename, config.LOGWrite,
